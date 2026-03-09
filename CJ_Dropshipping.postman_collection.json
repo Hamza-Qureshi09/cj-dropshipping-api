@@ -1,0 +1,577 @@
+{
+  "info": {
+    "name": "CJ Dropshipping Backend",
+    "description": "Complete API collection for the CJ Dropshipping Deno 2.7 backend.\n\nBase URL is set via the `baseUrl` collection variable — change it to your deployed URL in production.\n\nFlow:\n1. Check /api/health first to confirm server + CJ auth is working\n2. Search products, grab a `pid` and `vid`\n3. Check shipping rates for that product\n4. Create an order\n5. Confirm payment, then track",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "pid",
+      "value": "your-product-id-here",
+      "type": "string",
+      "description": "CJ Product ID — fill in after searching products"
+    },
+    {
+      "key": "vid",
+      "value": "your-variant-id-here",
+      "type": "string",
+      "description": "CJ Variant ID — fill in from product variants"
+    },
+    {
+      "key": "storeOrderId",
+      "value": "STORE-ORD-001",
+      "type": "string",
+      "description": "Your own store order ID"
+    },
+    {
+      "key": "cjOrderId",
+      "value": "your-cj-order-id-here",
+      "type": "string",
+      "description": "CJ Order ID — returned after creating an order"
+    }
+  ],
+  "item": [
+    {
+      "name": "🩺 Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Checks MongoDB connection and CJ Dropshipping API authentication status. Returns 200 if healthy, 503 if degraded."
+          },
+          "response": [
+            {
+              "name": "Healthy",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"healthy\",\n  \"timestamp\": \"2025-03-06T10:00:00.000Z\",\n  \"services\": {\n    \"database\": \"connected\",\n    \"cjDropshipping\": \"authenticated\"\n  }\n}"
+            },
+            {
+              "name": "Degraded",
+              "status": "Service Unavailable",
+              "code": 503,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"degraded\",\n  \"timestamp\": \"2025-03-06T10:00:00.000Z\",\n  \"services\": {\n    \"database\": \"error\",\n    \"cjDropshipping\": \"authenticated\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Token Info (Dev Only)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/token-info",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "token-info"]
+            },
+            "description": "Returns CJ token expiry metadata (no raw tokens). Only works when NODE_ENV=development."
+          },
+          "response": [
+            {
+              "name": "Token Info",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"accessTokenExpiryDate\": \"2025-03-21T10:00:00.000Z\",\n    \"refreshTokenExpiryDate\": \"2025-09-01T10:00:00.000Z\",\n    \"openId\": 123456,\n    \"createdAt\": \"2025-03-06T10:00:00.000Z\",\n    \"updatedAt\": \"2025-03-06T10:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📦 Products",
+      "item": [
+        {
+          "name": "Search Products",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/products/search?productName=wireless earbuds&pageNum=1&pageSize=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "search"],
+              "query": [
+                {
+                  "key": "productName",
+                  "value": "wireless earbuds",
+                  "description": "Keyword to search"
+                },
+                {
+                  "key": "categoryId",
+                  "value": "",
+                  "description": "Optional CJ category ID",
+                  "disabled": true
+                },
+                {
+                  "key": "categoryKeyword",
+                  "value": "",
+                  "description": "Optional category keyword",
+                  "disabled": true
+                },
+                {
+                  "key": "minPrice",
+                  "value": "1",
+                  "description": "Minimum price (USD)",
+                  "disabled": true
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "50",
+                  "description": "Maximum price (USD)",
+                  "disabled": true
+                },
+                {
+                  "key": "pageNum",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10",
+                  "description": "Results per page (max 200)"
+                },
+                {
+                  "key": "orderBy",
+                  "value": "",
+                  "description": "Sort field e.g. listedNum (popularity)",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Search CJ Dropshipping product catalog. Results come directly from CJ API."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"total\": 248,\n    \"pageNum\": 1,\n    \"pageSize\": 10,\n    \"list\": [\n      {\n        \"pid\": \"CJA0001234\",\n        \"productName\": \"无线蓝牙耳机 TWS\",\n        \"productNameEn\": \"Wireless Bluetooth Earbuds TWS\",\n        \"productSku\": \"SKU-TWS-001\",\n        \"productImage\": \"https://img.cjdropshipping.com/product/earbuds.jpg\",\n        \"productWeight\": 85.5,\n        \"categoryId\": \"4063\",\n        \"categoryName\": \"Earphones & Headphones\",\n        \"sellPrice\": 4.99,\n        \"supplierId\": \"SUP001\",\n        \"supplierName\": \"Shenzhen Electronics Co.\",\n        \"listedNum\": 3420,\n        \"variants\": []\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Categories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/products/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "categories"],
+              "query": [
+                {
+                  "key": "parentId",
+                  "value": "",
+                  "description": "Leave empty for top-level categories, or pass a parent ID to get subcategories",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get product categories. Leave parentId empty to get top-level categories. Pass a category ID to get its subcategories."
+          },
+          "response": [
+            {
+              "name": "Top-level Categories",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"2000\",\n      \"categoryName\": \"电子产品\",\n      \"categoryNameEn\": \"Electronics\",\n      \"parentId\": \"0\",\n      \"level\": 1\n    },\n    {\n      \"id\": \"3000\",\n      \"categoryName\": \"服装\",\n      \"categoryNameEn\": \"Clothing\",\n      \"parentId\": \"0\",\n      \"level\": 1\n    },\n    {\n      \"id\": \"4000\",\n      \"categoryName\": \"家居用品\",\n      \"categoryNameEn\": \"Home & Garden\",\n      \"parentId\": \"0\",\n      \"level\": 1\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Subcategories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/products/categories?parentId=2000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "categories"],
+              "query": [
+                {
+                  "key": "parentId",
+                  "value": "2000",
+                  "description": "Parent category ID"
+                }
+              ]
+            },
+            "description": "Get subcategories under Electronics (id: 2000)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product Detail",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{pid}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "{{pid}}"]
+            },
+            "description": "Get full product detail by CJ product ID (pid). Result is cached in MongoDB for 1 hour — second call is instant."
+          },
+          "response": [
+            {
+              "name": "Success (cached)",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"pid\": \"CJA0001234\",\n    \"productNameEn\": \"Wireless Bluetooth Earbuds TWS\",\n    \"productImage\": \"https://img.cjdropshipping.com/product/earbuds.jpg\",\n    \"productWeight\": 85.5,\n    \"categoryId\": \"4063\",\n    \"categoryName\": \"Earphones & Headphones\",\n    \"sellPrice\": 4.99,\n    \"description\": \"<p>High quality wireless earbuds...</p>\",\n    \"productImages\": [\n      \"https://img.cjdropshipping.com/product/earbuds_1.jpg\",\n      \"https://img.cjdropshipping.com/product/earbuds_2.jpg\"\n    ],\n    \"variants\": [\n      {\n        \"vid\": \"CJA0001234-BLACK\",\n        \"variantNameEn\": \"Black\",\n        \"variantSku\": \"TWS-BLK-001\",\n        \"variantImage\": \"https://img.cjdropshipping.com/product/earbuds_black.jpg\",\n        \"variantWeight\": 85.5,\n        \"sellPrice\": 4.99,\n        \"isSell\": 1\n      },\n      {\n        \"vid\": \"CJA0001234-WHITE\",\n        \"variantNameEn\": \"White\",\n        \"variantSku\": \"TWS-WHT-001\",\n        \"variantImage\": \"https://img.cjdropshipping.com/product/earbuds_white.jpg\",\n        \"variantWeight\": 85.5,\n        \"sellPrice\": 4.99,\n        \"isSell\": 1\n      }\n    ]\n  }\n}"
+            },
+            {
+              "name": "Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"error\": \"Product CJA9999999 not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Product Variants",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{pid}}/variants",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "{{pid}}", "variants"]
+            },
+            "description": "Get all variants for a product (colors, sizes, etc). You need the `vid` from here to calculate shipping and create orders."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"vid\": \"CJA0001234-BLACK\",\n      \"variantNameEn\": \"Black\",\n      \"variantSku\": \"TWS-BLK-001\",\n      \"variantImage\": \"https://img.cjdropshipping.com/v/earbuds_black.jpg\",\n      \"variantWeight\": 85.5,\n      \"sellPrice\": 4.99,\n      \"isSell\": 1\n    },\n    {\n      \"vid\": \"CJA0001234-WHITE\",\n      \"variantNameEn\": \"White\",\n      \"variantSku\": \"TWS-WHT-001\",\n      \"variantImage\": \"https://img.cjdropshipping.com/v/earbuds_white.jpg\",\n      \"variantWeight\": 85.5,\n      \"sellPrice\": 4.99,\n      \"isSell\": 1\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Clear Product Cache (by pid)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/products/cache/{{pid}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "cache", "{{pid}}"]
+            },
+            "description": "Force-expire the MongoDB cache for a specific product. Next GET for this pid will fetch fresh from CJ."
+          },
+          "response": [
+            {
+              "name": "Cleared",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"Cache cleared for product CJA0001234\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Clear All Product Cache",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/products/cache/all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "cache", "all"]
+            },
+            "description": "Wipe the entire product_cache collection in MongoDB. All next requests will re-fetch from CJ."
+          },
+          "response": [
+            {
+              "name": "Cleared",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"All product cache cleared\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🚚 Shipping",
+      "item": [
+        {
+          "name": "Calculate Shipping Rates",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/shipping/rates",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shipping", "rates"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pid\": \"{{pid}}\",\n  \"vid\": \"{{vid}}\",\n  \"quantity\": 1,\n  \"countryCode\": \"US\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Get available shipping methods and costs for a specific product+variant going to a country.\n\nCommon country codes: US, GB, AU, CA, DE, FR, PK, IN, NG, AE\n\nDo this BEFORE creating an order so you can show shipping options to your customer and pick a `shippingName` to pass into the order."
+          },
+          "response": [
+            {
+              "name": "Rates for US",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"logisticName\": \"CJPacket Ordinary\",\n      \"logisticNameEn\": \"CJPacket Ordinary\",\n      \"logisticPrice\": 1.85,\n      \"logisticTime\": \"12-20\",\n      \"isTracked\": true\n    },\n    {\n      \"logisticName\": \"CJPacket Sensitive\",\n      \"logisticNameEn\": \"CJPacket Sensitive\",\n      \"logisticPrice\": 2.30,\n      \"logisticTime\": \"10-18\",\n      \"isTracked\": true\n    },\n    {\n      \"logisticName\": \"USPS First Class\",\n      \"logisticNameEn\": \"USPS First Class\",\n      \"logisticPrice\": 4.50,\n      \"logisticTime\": \"7-14\",\n      \"isTracked\": true\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing Fields",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"error\": \"pid is required\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Shipping Methods by Country",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/shipping/methods/US",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shipping", "methods", "US"]
+            },
+            "description": "Get all available shipping carriers/methods for a country code.\n\nUseful to populate a dropdown for customers before they select a shipping method."
+          },
+          "response": [
+            {
+              "name": "Methods for US",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"logisticName\": \"CJPacket Ordinary\",\n      \"logisticNameEn\": \"CJPacket Ordinary\",\n      \"countryCode\": \"US\"\n    },\n    {\n      \"logisticName\": \"USPS First Class\",\n      \"logisticNameEn\": \"USPS First Class\",\n      \"countryCode\": \"US\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🛒 Orders",
+      "item": [
+        {
+          "name": "Create Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success && res.data?.cjOrderId) {",
+                  "  pm.collectionVariables.set('cjOrderId', res.data.cjOrderId);",
+                  "  console.log('✅ cjOrderId saved:', res.data.cjOrderId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderNumber\": \"STORE-ORD-001\",\n  \"shippingCountry\": \"US\",\n  \"shippingAddress\": {\n    \"consignee\": \"John Doe\",\n    \"phone\": \"+12125552368\",\n    \"email\": \"john.doe@example.com\",\n    \"country\": \"US\",\n    \"province\": \"California\",\n    \"city\": \"Los Angeles\",\n    \"address\": \"123 Main Street\",\n    \"address2\": \"Apt 4B\",\n    \"zip\": \"90001\"\n  },\n  \"products\": [\n    {\n      \"vid\": \"{{vid}}\",\n      \"quantity\": 2,\n      \"shippingName\": \"CJPacket Ordinary\"\n    }\n  ],\n  \"remark\": \"Please pack carefully\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Submit an order to CJ Dropshipping.\n\n- `orderNumber` = your store's unique order ID (used for idempotency — safe to retry)\n- `vid` = variant ID from /products/:pid/variants\n- `shippingName` = logistics method from /shipping/rates\n\nThe test script auto-saves `cjOrderId` to the collection variable for use in subsequent requests."
+          },
+          "response": [
+            {
+              "name": "Order Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"storeOrderId\": \"STORE-ORD-001\",\n    \"cjOrderId\": \"CJ20250306001234\",\n    \"status\": \"submitted\",\n    \"customerInfo\": {\n      \"consignee\": \"John Doe\",\n      \"phone\": \"+12125552368\",\n      \"email\": \"john.doe@example.com\",\n      \"country\": \"US\",\n      \"province\": \"California\",\n      \"city\": \"Los Angeles\",\n      \"address\": \"123 Main Street\",\n      \"address2\": \"Apt 4B\",\n      \"zip\": \"90001\"\n    },\n    \"products\": [\n      {\n        \"vid\": \"CJA0001234-BLACK\",\n        \"quantity\": 2,\n        \"shippingName\": \"CJPacket Ordinary\"\n      }\n    ],\n    \"createdAt\": \"2025-03-06T10:00:00.000Z\",\n    \"updatedAt\": \"2025-03-06T10:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "Duplicate (already submitted)",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"storeOrderId\": \"STORE-ORD-001\",\n    \"cjOrderId\": \"CJ20250306001234\",\n    \"status\": \"submitted\",\n    \"_note\": \"Returned existing order — idempotent\"\n  }\n}"
+            },
+            {
+              "name": "Validation Error",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"error\": \"products array is required\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Orders",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Results per page (max 100)"
+                },
+                {
+                  "key": "status",
+                  "value": "shipped",
+                  "description": "Filter by status: pending | submitted | processing | shipped | delivered | cancelled",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List all orders stored locally in MongoDB with pagination. Optionally filter by status."
+          },
+          "response": [
+            {
+              "name": "Orders List",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"storeOrderId\": \"STORE-ORD-001\",\n      \"cjOrderId\": \"CJ20250306001234\",\n      \"status\": \"shipped\",\n      \"trackingNumbers\": [\"YT2400000012345678\"],\n      \"createdAt\": \"2025-03-06T10:00:00.000Z\",\n      \"updatedAt\": \"2025-03-07T08:30:00.000Z\"\n    },\n    {\n      \"storeOrderId\": \"STORE-ORD-002\",\n      \"cjOrderId\": \"CJ20250306001235\",\n      \"status\": \"processing\",\n      \"trackingNumbers\": [],\n      \"createdAt\": \"2025-03-06T11:00:00.000Z\",\n      \"updatedAt\": \"2025-03-06T11:00:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 20,\n    \"total\": 2,\n    \"pages\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Order by Store ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{storeOrderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{storeOrderId}}"]
+            },
+            "description": "Fetch a single order from MongoDB using YOUR store's order ID (not CJ's ID).\n\nUseful to check order state without hitting the CJ API."
+          },
+          "response": [
+            {
+              "name": "Found",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"storeOrderId\": \"STORE-ORD-001\",\n    \"cjOrderId\": \"CJ20250306001234\",\n    \"status\": \"submitted\",\n    \"customerInfo\": {\n      \"consignee\": \"John Doe\",\n      \"country\": \"US\",\n      \"city\": \"Los Angeles\",\n      \"zip\": \"90001\"\n    },\n    \"products\": [\n      { \"vid\": \"CJA0001234-BLACK\", \"quantity\": 2 }\n    ],\n    \"trackingNumbers\": [],\n    \"createdAt\": \"2025-03-06T10:00:00.000Z\",\n    \"updatedAt\": \"2025-03-06T10:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"error\": \"Order STORE-ORD-001 not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Sync Order Status from CJ",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{cjOrderId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{cjOrderId}}", "status"]
+            },
+            "description": "Fetches live order status from CJ API and syncs it to your MongoDB.\n\nUse this to poll for order updates (processing → shipped). The `status` field in MongoDB is updated automatically."
+          },
+          "response": [
+            {
+              "name": "Order Status",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"orderId\": \"CJ20250306001234\",\n    \"orderNum\": \"STORE-ORD-001\",\n    \"status\": \"SHIPPED\",\n    \"statusName\": \"Shipped\",\n    \"payStatus\": \"PAID\",\n    \"shippingCountry\": \"US\",\n    \"createTime\": \"2025-03-06T10:00:00.000Z\",\n    \"logisticList\": [\n      {\n        \"trackNumber\": \"YT2400000012345678\",\n        \"shippingName\": \"CJPacket Ordinary\",\n        \"logisticStatus\": \"In Transit\",\n        \"updateTime\": \"2025-03-07T08:30:00.000Z\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Order Tracking",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{cjOrderId}}/tracking",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{cjOrderId}}", "tracking"]
+            },
+            "description": "Get detailed tracking events/checkpoints for an order from CJ.\n\nShare the tracking number with your customer so they can track on 17track, Aftership, etc."
+          },
+          "response": [
+            {
+              "name": "Tracking Info",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"trackNumber\": \"YT2400000012345678\",\n    \"logisticName\": \"CJPacket Ordinary\",\n    \"trackingList\": [\n      {\n        \"date\": \"2025-03-07 08:30:00\",\n        \"context\": \"Package in transit — Los Angeles, CA\",\n        \"ftime\": \"2025-03-07T08:30:00.000Z\"\n      },\n      {\n        \"date\": \"2025-03-06 18:00:00\",\n        \"context\": \"Package picked up by carrier\",\n        \"ftime\": \"2025-03-06T18:00:00.000Z\"\n      },\n      {\n        \"date\": \"2025-03-06 12:00:00\",\n        \"context\": \"Order shipped from CJ warehouse — Shenzhen\",\n        \"ftime\": \"2025-03-06T12:00:00.000Z\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Confirm Order Payment",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{cjOrderId}}/confirm",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{cjOrderId}}", "confirm"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Confirm to CJ that you have paid for this order. CJ will then start processing and fulfillment.\n\nCall this after you have charged your customer and paid CJ (via your CJ wallet balance).\n\nOrder status in MongoDB is updated to `processing` on success."
+          },
+          "response": [
+            {
+              "name": "Confirmed",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"confirmed\": true,\n    \"message\": \"Payment confirmed with CJ\"\n  }\n}"
+            },
+            {
+              "name": "Failed",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"confirmed\": false,\n    \"message\": \"Confirmation failed\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
